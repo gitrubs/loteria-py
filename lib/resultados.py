@@ -421,8 +421,8 @@ class DuplaSena(LotteryCaixa, object):
     def _parse_result(self, data):
         fields = data.split("|")
 
-        for i, field_data in enumerate(fields):
-            print i, field_data
+        # for i, field_data in enumerate(fields):
+        #     print i, field_data
 
         # Return error for data format content
         if(len(fields) < 5):
@@ -1209,7 +1209,7 @@ class LotecaMatches(LotteryCaixa, object):
             "/loterias/loterias/loteca/loteca_programacao_new.asp"
 
     def _parse_result(self, data):
-        print data
+        # print data
 
         fields = data.split(
             '<div id="coluna_esquerda">')[1].split("</div>")[0]
