@@ -5,6 +5,7 @@ from cookielib import CookieJar
 from urllib2 import HTTPError, URLError
 import urllib2
 from datetime import date
+from xml.dom.minidom import parseString
 
 
 class LotteryCaixa(object):
@@ -1205,49 +1206,147 @@ class LotecaMatches(LotteryCaixa, object):
         self.teams_col2 = []
         self.matches_date = []
 
+        # Replace default host
+        self.host = "www.loterias.caixa.gov.br"
         self.lottery_type_url = \
-            "/loterias/loterias/loteca/loteca_programacao_new.asp"
+            "/wps/portal/loterias/landing/loteca/programacao"
+
+        self.next_prize_pool = None
+        self.accumulated = None
+        self.final_accumulated = None
+
+        self.final_draw = None
+
+        self.xml = None
+
+    def __str__(self):
+        text_array = []
+
+        text_array.append("LotecaMatches:")
+        text_array.append("draw: %s" % str(self.draw))
+        text_array.append("draw_date: %s" % str(self.draw_date))
+        text_array.append("next_prize_pool: %s" % str(self.next_prize_pool))
+        text_array.append(
+            "accumulated from 14 matches: %s" % str(self.accumulated))
+        text_array.append(
+            "accumulated for final draw: %s" % str(self.final_accumulated))
+        text_array.append("final_draw: %s" % str(self.final_draw))
+        text_array.append("host: %s" % str(self.host))
+        text_array.append("lottery_type_url: %s" % str(self.lottery_type_url))
+
+        text_array.append("teams_col1: %s" % str(self.teams_col1))
+        text_array.append("teams_col2: %s" % str(self.teams_col2))
+        text_array.append("matches_date: %s" % str(self.matches_date))
+
+        return "\n".join(text_array)
+
+    def get_result(self):
+        """These get result retrieve data from new URL from Caixa.
+        It's only retrieve the last matches.
+
+        Args:
+            draw: lottery draw number (default: None).
+
+        Returns:
+            Return core representing error:
+
+        """
+        url = "http://" + self.host + self.lottery_type_url
+
+        result = self.http_request(url)
+        if(type(result) is int):
+            return result
+
+        # Parse data content
+        if(self._parse_result(result.read()) is False):
+            # If parser result fails, it returns the error code
+            return self.ERROR_DATA_CONTENT
+
+        return self.SUCCESS
 
     def _parse_result(self, data):
-        # print data
+        """Parse Loteca matches HTML data from Caixa.
 
-        fields = data.split(
-            '<div id="coluna_esquerda">')[1].split("</div>")[0]
-        fields = fields.split("<tr class=\"linhas\">")
-        fields.pop(0)
+        This parser take div with class "resultado-loteria" and parse it
+        to XML DOM object to access Loteca matches data.
+        """
+        dev_start_str = "<div class=\"resultado-loteria\">"
+        result_div = data.split(dev_start_str)[1]
 
-        for i, field_data in enumerate(fields):
-            print i, field_data
+        div_end_str = "<div class=\"wpthemeClear\">"
+        result_div = result_div.split(div_end_str)[0]
 
-        if(len(fields) < 5):
-            print(
-                "LotecaMatches data content without result data: %r" % (data))
-            return False
+        # Add XML header to
+        xml_version = "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
 
-        self.conc = data.split(
-            "<span class=\"txt_nr_concurso\">")[1].split("</span>")[0]
+        result_div = xml_version + dev_start_str + result_div
 
-        tmpdata = data.split(
-            "<span class=\"txt_nr_concurso\">")[1].split("</p>")[0].split(
-            "</span>")[1]
-        self.data = tmpdata.split("dia")[1].split("&nbsp")[0].replace(
-            " ", "")
+        # Remove tabspaces, newlines and HTML special chars
+        tmp = result_div.replace("\t", "")
+        tmp = tmp.replace("\r\n", "").replace("> <", "><")
+        tmp = tmp.replace("&nbsp;", "")
 
-        for i in fields:
-            if (len(i.split("<td class=\"times_coluna1\">")) > 1):
-                    team1 = i.split(
-                        "<td class=\"times_coluna1\">")[1].split(
-                        "</td>")[0].replace("\t", "").replace("\r\n", "")
-                    team2 = i.split(
-                        "<td class=\"times_coluna2\">")[1].split(
-                        "</td>")[0].replace("\t", "").replace("\r\n", "")
-                    match_day = i.split(
-                        "<td class=\"dia_semana\">")[1].split(
-                        "</td>")[0].replace("\t", "").replace("\r\n", "")
+        # Fix mal-formed tags syntax when loaded from site
+        tmp = tmp.replace("imgsrc=", "img src=")
+        tmp = tmp.replace(".png\">", ".png\"/>")
+        tmp = tmp.replace("spanclass", "span class")
 
-                    self.teams_col1.append(team1)
-                    self.teams_col2.append(team2)
-                    self.matches_date.append(match_day)
+        # Remove lasts </div> from parent tags
+        tmp = tmp.replace("</div></div></div>", "")
+
+        # Load XML DOM with Loteca Matches data
+        self.xml = parseString(tmp)
+        # print(self.xml.toprettyxml())
+
+        # from xml.dom.minidom import parse
+
+        # self.xml = parse("tmp.xml")
+        # print(self.xml.toxml())
+
+        conc_tag = self.xml.getElementsByTagName("small")[0]
+        self.draw = conc_tag.firstChild.data.split("(")[0].split(" ")[1]
+        self.draw_date = conc_tag.firstChild.data.split("(")[1].split(",")[0]
+
+        tbody = self.xml.getElementsByTagName("tbody")[0]
+        fields = tbody.getElementsByTagName("tr")
+        for tr in fields:
+            td_list = tr.getElementsByTagName("td")
+            team1 = td_list[2].firstChild.data
+            team2 = td_list[4].firstChild.data
+            match_day = td_list[6].firstChild.data
+
+            self.teams_col1.append(team1)
+            self.teams_col2.append(team2)
+            self.matches_date.append(match_day)
+
+        prize_pool_div = self.xml.getElementsByTagName("div")[1]
+        prize_pool_p = prize_pool_div.getElementsByTagName("p")[1]
+        prize_pool_str = prize_pool_p.firstChild.data
+
+        self.next_prize_pool = \
+            self._convert_string_float(prize_pool_str.split(" ")[1])
+
+        accumulated_div = self.xml.getElementsByTagName("div")[2]
+        accumulated_p = accumulated_div.getElementsByTagName("p")[0]
+        accumulated_span = accumulated_p.getElementsByTagName("span")[1]
+
+        self.accumulated = \
+            self._convert_string_float(
+                accumulated_span.firstChild.data.replace("R$", ""))
+
+        final_accumulated_p = accumulated_div.getElementsByTagName("p")[1]
+        final_accumulated_span = \
+            final_accumulated_p.getElementsByTagName("span")[1]
+        self.final_accumulated = \
+            self._convert_string_float(
+                final_accumulated_span.firstChild.data.replace("R$", ""))
+
+        final_draw_span = \
+            final_accumulated_p.getElementsByTagName("span")[0]
+
+        self.final_draw = \
+            int(final_draw_span.firstChild.data.split("(")[1].split(")")[0])
+
         return True
 
 

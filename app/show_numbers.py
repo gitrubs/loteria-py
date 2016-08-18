@@ -121,7 +121,6 @@ def main(lottery_type, lottery_draw):
     elif(lottery_type == "loteca-matches"):
         loteca_matches = LotecaMatches()
         result = loteca_matches.get_result()
-        return 0
         if(result == 0):
             print str(loteca_matches).decode("latin-1")
         else:
