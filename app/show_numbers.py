@@ -3,17 +3,17 @@
 
 import argparse
 
-from resultados import MegaSena
-from resultados import DuplaSena
-from resultados import Quina
-from resultados import Lotomania
-from resultados import Lotofacil
-from resultados import Timemania
-from resultados import Lotogol
-from resultados import LotecaResult
-from resultados import LotecaMatches
-from resultados import Federal
-from resultados import Bicho
+from lib.resultados import MegaSena
+from lib.resultados import DuplaSena
+from lib.resultados import Quina
+from lib.resultados import Lotomania
+from lib.resultados import Lotofacil
+from lib.resultados import Timemania
+from lib.resultados import Lotogol
+from lib.resultados import LotecaResult
+from lib.resultados import LotecaMatches
+from lib.resultados import Federal
+from lib.resultados import Bicho
 
 
 def main(lottery_type, lottery_draw):
@@ -120,7 +120,7 @@ def main(lottery_type, lottery_draw):
 
     elif(lottery_type == "loteca-matches"):
         loteca_matches = LotecaMatches()
-        result = loteca_matches.get_result(draw=lottery_draw)
+        result = loteca_matches.get_result()
         if(result == 0):
             print str(loteca_matches).decode("latin-1")
         else:
