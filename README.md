@@ -9,7 +9,8 @@ from resultados import MegaSena
 
 mega = MegaSena()
 
-result = mega.get_result(draw=lottery_draw)
+# Get last Mega Sena draw
+result = mega.get_result()
 
 if(result == 0):
   print str(mega).decode("latin-1")
@@ -33,20 +34,22 @@ Library implements other lottery type such as:
 A test program can be found in 'test' directory:
 
 ```
-python test/show_numbers.py -h
+python -m app.show_numbers -h
 ```
 
 To get the last result from MegaSena, run:
 
 ```
-python test/show_numbers.py -t megasena
+python -m app.show_numbers -t megasena
 ```
 
 If you want an specific draw (for example 1828), run:
 ```
-python test/show_numbers.py -t megasena -d 1828
+python -m app.show_numbers -t megasena -d 1828
 ```
 
 # TODO
 
 * Implement the Loteca matches from new web page from Caixa;
+* Add exception class;
+* Add Python Package (setup.py);
